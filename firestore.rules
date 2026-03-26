@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isParticipant(sessionId) {
+      let session = get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+      return (session.isPublic == true) || (isAuthenticated() && (session.ownerId == request.auth.uid || request.auth.uid in session.participantIds));
+    }
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+             data.email is string &&
+             data.email.size() > 0 &&
+             data.email.size() < 100;
+    }
+
+    function isValidSession(data) {
+      return data.title is string &&
+             data.title.size() > 0 &&
+             data.title.size() < 100 &&
+             data.activeAgentIds is list &&
+             data.participantIds is list;
+    }
+
+    function isValidMessage(data) {
+      return data.agentId is string &&
+             data.role in ['user', 'assistant', 'system'] &&
+             data.content is string &&
+             data.content.size() > 0 &&
+             data.content.size() < 5000 &&
+             data.timestamp is number;
+    }
+
+    function isValidAgent(data) {
+      return data.ownerId == request.auth.uid &&
+             data.name is string &&
+             data.name.size() > 0 &&
+             data.name.size() < 100 &&
+             data.role is string &&
+             data.model is string &&
+             data.provider in ['google', 'openai', 'deepseek', 'qwen', 'xai'] &&
+             (!('mcpServers' in data) || data.mcpServers is list) &&
+             (!('systemInstruction' in data) || data.systemInstruction is string) &&
+             (!('isTemplate' in data) || data.isTemplate is bool);
+    }
+
+    function isValidApiKey(data) {
+      return data.provider is string &&
+             data.key is string &&
+             data.key.size() > 0 &&
+             data.key.size() < 500;
+    }
+
+    function isValidFriendship(data) {
+      return data.user1Id is string &&
+             data.user2Id is string &&
+             data.status in ['pending', 'accepted'] &&
+             data.createdAt is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /secrets/{provider} {
+        allow read, write: if isOwner(userId) && isValidApiKey(request.resource.data);
+      }
+    }
+
+    match /agents/{agentId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidAgent(request.resource.data);
+      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid && (request.method == 'DELETE' || isValidAgent(request.resource.data));
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isParticipant(sessionId);
+      allow create: if isAuthenticated() && isValidSession(request.resource.data);
+      allow update: if isParticipant(sessionId) && isValidSession(request.resource.data);
+      allow delete: if isAuthenticated() && get(/databases/$(database)/documents/sessions/$(sessionId)).data.ownerId == request.auth.uid;
+
+      match /messages/{messageId} {
+        allow read: if isParticipant(sessionId);
+        allow create: if isParticipant(sessionId) && isValidMessage(request.resource.data);
+      }
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if isAuthenticated() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.user1Id == request.auth.uid && isValidFriendship(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.user2Id == request.auth.uid || resource.data.user1Id == request.auth.uid) && isValidFriendship(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+    }
+  }
+}

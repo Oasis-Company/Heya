@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "ChatSession": {
+      "title": "ChatSession",
+      "description": "A collaborative chat session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "participantIds": { "type": "array", "items": { "type": "string" } },
+        "title": { "type": "string" },
+        "activeAgentIds": { "type": "array", "items": { "type": "string" } },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "lastMessageAt": { "type": "number" }
+      },
+      "required": ["ownerId", "title", "activeAgentIds", "participantIds"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "agentId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant", "system"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["sessionId", "agentId", "role", "content", "timestamp"]
+    },
+    "Agent": {
+      "title": "Agent",
+      "description": "A user-created AI agent.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "color": { "type": "string" },
+        "avatar": { "type": "string" },
+        "description": { "type": "string" },
+        "provider": { "type": "string", "enum": ["google", "openai", "deepseek", "qwen", "xai"] },
+        "model": { "type": "string" },
+        "mcpServers": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "apiKey": { "type": "string" }
+            },
+            "required": ["name", "url"]
+          }
+        },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["ownerId", "name", "role", "model", "provider"]
+    },
+    "ApiKey": {
+      "title": "ApiKey",
+      "description": "User-provided API key for a provider.",
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string" },
+        "key": { "type": "string" },
+        "baseUrl": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["provider", "key"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "A friendship between two users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user1Id": { "type": "string" },
+        "user2Id": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["user1Id", "user2Id", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/users/{userId}/secrets/{provider}": {
+      "schema": "ApiKey",
+      "description": "User's private API keys."
+    },
+    "/agents/{agentId}": {
+      "schema": "Agent",
+      "description": "User-created agents."
+    },
+    "/sessions/{sessionId}": {
+      "schema": "ChatSession",
+      "description": "Chat session documents."
+    },
+    "/sessions/{sessionId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a session."
+    },
+    "/friendships/{friendshipId}": {
+      "schema": "Friendship",
+      "description": "Friendship documents."
+    }
+  }
+}
